@@ -6,9 +6,10 @@ import { InputController, KEYS } from './input';
 
 export class FirstPersonCamera {
 
-    constructor(characterId, camera, character, world3d) {
+    constructor(characterId, heightRatio, camera, character, world3d) {
 
         this.characterId = characterId
+        this.heightRatio = heightRatio
         this.camera_ = camera;
         this.world3d = world3d
         this.input_ = new InputController(characterId)
@@ -28,6 +29,7 @@ export class FirstPersonCamera {
         this.headBobActive_ = false;
         this.headBobTimer_ = 0;
         this.isOnGround = false
+        this.speed = 50
         
     }
 
@@ -42,7 +44,7 @@ export class FirstPersonCamera {
         // if (this.body) {
             this.updateRotation_(timeElapsedS)
             this.updateTranslation_(timeElapsedS)
-            this.updateCamera_()
+            // this.updateCamera_()
 
             // this.updateGroundContact()
             // if (this.isOnGround) {
@@ -53,32 +55,6 @@ export class FirstPersonCamera {
             // this.input_.update(timeElapsedS)
             //this.updateHeadBob_(timeElapsedS)
         // }
-    }
-
-
-    updateCamera_() {
-        //this.character.quaternion.copy(this.rotation_);
-        // this.camera_.quaternion.copy(this.rotation_)
-        // this.character.position.copy(this.translation_)
-        // this.character.position.copy(this.translation_)
-        //this.character.quaternion.copy(this.rotation_)
-
-        // // Assume `quaternion` is the given quaternion you want to extract the Y-axis rotation from
-        // const quaternion = this.rotation_; // Replace with your actual quaternion
-
-        // // Convert the quaternion to Euler angles
-        // const euler = new THREE.Euler().setFromQuaternion(quaternion, 'YXZ'); // 'YXZ' order to ensure Y-axis is considered first
-
-        // // Extract the Y-axis rotation (in radians)
-        // const yRotation = euler.y;
-
-        // // Apply the Y-axis rotation to the object's quaternion
-        // const yQuaternion = new THREE.Quaternion();
-        // yQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yRotation);
-
-        // // Apply the rotation to the object
-        // this.character.children[0].quaternion.premultiply(yQuaternion);
-        //this.camera_.position.y += Math.sin(this.headBobTimer_ * 10) * 0.5;
     }
 
     updateHeadBob_(timeElapsedS) {
@@ -128,15 +104,15 @@ export class FirstPersonCamera {
 
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyQuaternion(qx);
-        forward.multiplyScalar(forwardVelocity * timeElapsedS * 50);
+        forward.multiplyScalar(forwardVelocity * timeElapsedS * this.speed * this.heightRatio);
 
         const left = new THREE.Vector3(-1, 0, 0);
         left.applyQuaternion(qx);
-        left.multiplyScalar(strafeVelocity * timeElapsedS * 50);
+        left.multiplyScalar(strafeVelocity * timeElapsedS * this.speed * this.heightRatio);
 
         const up = new THREE.Vector3(0, -1, 0); // Correct upward direction
         up.applyQuaternion(qx)
-        up.multiplyScalar(verticalVelocity * timeElapsedS * 50); // Scale by vertical velocity
+        up.multiplyScalar(verticalVelocity * timeElapsedS * this.speed * this.heightRatio); // Scale by vertical velocity
         
         // Update the camera translation with forward and strafe velocities
         this.translation_.add(forward);
@@ -148,6 +124,32 @@ export class FirstPersonCamera {
         }
 
     }
+
+    // updateCamera_() {
+        //this.character.quaternion.copy(this.rotation_);
+        // this.camera_.quaternion.copy(this.rotation_)
+        // this.character.position.copy(this.translation_)
+        // this.character.position.copy(this.translation_)
+        //this.character.quaternion.copy(this.rotation_)
+
+        // // Assume `quaternion` is the given quaternion you want to extract the Y-axis rotation from
+        // const quaternion = this.rotation_; // Replace with your actual quaternion
+
+        // // Convert the quaternion to Euler angles
+        // const euler = new THREE.Euler().setFromQuaternion(quaternion, 'YXZ'); // 'YXZ' order to ensure Y-axis is considered first
+
+        // // Extract the Y-axis rotation (in radians)
+        // const yRotation = euler.y;
+
+        // // Apply the Y-axis rotation to the object's quaternion
+        // const yQuaternion = new THREE.Quaternion();
+        // yQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yRotation);
+
+        // // Apply the rotation to the object
+        // this.character.children[0].quaternion.premultiply(yQuaternion);
+        //this.camera_.position.y += Math.sin(this.headBobTimer_ * 10) * 0.5;
+    // }
+
 
     // bodiesAreEqual(body1, body2) {
     //     return body1.kB === body2.kB

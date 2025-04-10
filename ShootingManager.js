@@ -1,20 +1,17 @@
 import * as THREE from 'three';
+import { Bullet } from './bullet';
 
 export class ShootingManager {
 
     constructor(world3d, gun, camera, camAudioManager, availableTargets) {
 
+        this.gun = gun;
         this.raycaster = new THREE.Raycaster();
         this.raycaster.layers.enableAll();
-        this.raycaster.far = 1000
+        this.raycaster.far = 10000
         this.raycasterOrigin = new THREE.Vector3();
         this.raycasterDirection = new THREE.Vector3();
 
-        this.gun = gun;
-        this.shooting = false
-
-        this.bulletsPerMinute = 100
-        this.cadence = this.#getCadence()
         this.world3d = world3d
         this.scene = world3d.scene;
         this.bullets = [];
@@ -22,44 +19,91 @@ export class ShootingManager {
         this.availableTargets = availableTargets
         this.camAudioManager = camAudioManager
 
-        this.rayHelper = null //new THREE.ArrowHelper(this.raycasterDirection, this.raycasterOrigin, 10, 0xff0000); // Red arrow
+        this.rayHelper = false
+
+        if (this.rayHelper) {
+            this.rayHelper = new THREE.ArrowHelper(this.raycasterDirection, this.raycasterOrigin, 10, 0xff0000)
+            this.world3d.scene.add(this.rayHelper)
+        }
         
+        this.shooting = false
+        this.shootingInterval = null
+        this.isAutomatic = this.gun.isAutomatic
         
-        //this.world3d.scene.add(this.rayHelper);
+
+    }
+
+    shoot = () => {
+
+        this.gun.shoot()
+        this.#addBullet()
+
+
+    }
+
+    stopShooting() {
+        clearInterval(this.shootingInterval);
+        this.shooting = false;
+    }
+
+    startShooting() {
+
+        if (this.isAutomatic) {
+            if (!this.shooting) {
+                this.shooting = true;
+                this.shoot()
+                this.shootingInterval = setInterval(() => {
+                    this.shoot()
+                }, this.gun.cadence) // Adjust the interval time (200 ms) as needed for automatic firing rate
+            }
+        } else {
+            // Semiautomatic fires only once per trigger pull
+            if (!this.shooting) {
+                this.shoot();
+                this.shooting = true; // Prevent continuous shooting until the mouse button is released
+            }
+        }
 
     }
 
     #addBullet() {
 
-        let bullet = new THREE.Object3D();
-        // Create a thin cylinder or box geometry to represent the laser
-        // const laserGeometry = new THREE.CylinderGeometry(0.05, 0.05, 2, 32); // Thin cylinder
-        // // Alternatively, use a box geometry for a rectangular laser:
-        // // const laserGeometry = new THREE.BoxGeometry(0.1, 0.1, 2); // Thin rectangular laser
+        let obj = new THREE.Object3D()
+        this.bullets.push(new Bullet(this.world3d, obj, this.camera))
 
-        // // Create a material with emissive properties to make it look like a glowing laser
-        // const laserMaterial = new THREE.MeshBasicMaterial({
-        //     color: 0xff0000, // Red laser color
-        //     emissive: 0xff0000, // Emissive color (same as base color)
-        //     emissiveIntensity: 1.5 // Make the laser appear to glow
-        // });
+    }
 
-        // // Create the laser mesh
-        // const laserBullet = new THREE.Mesh(laserGeometry, laserMaterial);
+    removeBullet(bullet) {
+        // NOTE Remove bullet from the world
+        bullet.remove()
 
-        // bullet = laserBullet
+        this.bullets.splice(this.bullets.indexOf(bullet), 1)
+    }
 
-        this.scene.add(bullet);
-        this.camera.getWorldPosition(bullet.position);
-        this.camera.getWorldQuaternion(bullet.quaternion);
+    onTargetHit = async (target, bullet) => {
 
+        // const boxHelper = new THREE.BoxHelper(target.object, 0xff0000); // Red wireframe box
+        // this.world3d.scene.add(boxHelper);
 
-        this.bullets.push(bullet);
+        let parent = target.object.rootParent
 
-        // if (this.bullets.length > 10) {
-        //     const oldBullet = this.bullets.shift()
-        //     oldBullet.removeFromParent()
-        // }  
+        // this.world3d.addSphere(target.point, 1)
+
+        if (parent) {
+
+            if (parent.gameTag.includes('character')) {
+                
+                let character = this.world3d.characters.find(c => c.uid === parent.uid)
+                character.hit(bullet)
+
+            }
+
+            let soundName
+            if (target.object.name === 'Paladin_J_Nordstrom') soundName = 'headshot'
+            else soundName = 'bullet_hit'
+            this.camAudioManager.playSound(soundName)
+
+        } 
 
     }
 
@@ -68,12 +112,12 @@ export class ShootingManager {
         [...this.bullets].forEach((bullet) => {
 
             // NOTE Raycast from each bullet and see if it hit any target compatible with the idea of being hit by a bullet
-            bullet.getWorldPosition(this.raycasterOrigin);
-            bullet.getWorldDirection(this.raycasterDirection);
+            bullet.model.getWorldPosition(this.raycasterOrigin)
+            bullet.model.getWorldDirection(this.raycasterDirection)
 
             // Ensure the direction is unitary
-            this.raycasterDirection.normalize();
-            this.raycasterDirection.multiplyScalar(-1);
+            this.raycasterDirection.normalize()
+            this.raycasterDirection.multiplyScalar(-1)
 
             if (this.rayHelper) {
                 this.rayHelper.setDirection(this.raycasterDirection);
@@ -81,137 +125,33 @@ export class ShootingManager {
                 this.rayHelper.position.copy(this.raycasterOrigin);
             }
 
+            this.raycaster.set(this.raycasterOrigin, this.raycasterDirection)
 
-            this.raycaster.set(this.raycasterOrigin, this.raycasterDirection);
+            const hits = this.raycaster.intersectObjects(this.availableTargets, true)
 
-            const hits = this.raycaster.intersectObjects(this.availableTargets, true);
+            const remove = bullet.manage()
+            if (remove) this.removeBullet(bullet)
             
 
             if (hits.length > 0) {
 
-                const firstHitTarget = hits[0];
+                const firstHitTarget = hits[0]
 
                 // NOTE React to being hit by the bullet in some way, for example:
-                this.onTargetHit(firstHitTarget);
+                this.onTargetHit(firstHitTarget, bullet)
 
-                // NOTE Remove bullet from the world
-                bullet.removeFromParent();
-
-                this.bullets.splice(this.bullets.indexOf(bullet), 1);
+                this.removeBullet(bullet)
 
             }
 
             // NOTE If no target was hit, just travel further, apply gravity to the bullet etc.
-            bullet.position.add(this.raycasterDirection.multiplyScalar(1));
+            bullet.model.position.add(this.raycasterDirection.multiplyScalar(bullet.speed));
 
         });
     };
 
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    #getCadence() {
-        return (1000 / (this.bulletsPerMinute / 60))
-    }
-
-    #playGunSound() {
-        if (this.gun.sound.isPlaying) 
-            this.gun.sound.stop()
-        this.gun.sound.currentTime = 0;
-        this.gun.sound.play()
-    }
-
-    shoot = () => {
-
-
-        //if (!this.shooting) {
-
-            this.shooting = true
-
-            this.#addBullet()
-
-            //this.#playGunSound()
-
-            // this.sleep(this.cadence).then(() => {
-            //     this.shooting = false
-            // })
-            
-        //} 
-
-    };
-
-    // stop_shooting = () => {
-    //     //this.gun.sound.stop()
-    //     this.shooting = false
-    // }
-
     addTarget(target) {
         this.availableTargets.push(target)
-    }
-
-
-    async #createSphere(target) {
-
-        const sound = this.camAudioManager.getSound('linkedin_msg')
-        
-        const sphereGeometry1 = new THREE.SphereGeometry(0.3, 32, 32); // Radius 5, width and height segments 32
-        const sphereMaterial1 = new THREE.MeshLambertMaterial({ color: 0xff0000 }); // Red color
-        const sphere = new THREE.Mesh(sphereGeometry1, sphereMaterial1);
-        const hitPoint = target.point;
-        sphere.position.copy(hitPoint);
-        this.scene.add(sphere);
-
-        sphere.add(sound);
-
-        sound.play();
-        target.object.attach(sphere);
-
-    }
-
-    onTargetHit = async (target) => {
-
-        // const boxHelper = new THREE.BoxHelper(target.object, 0xff0000); // Red wireframe box
-        // this.world3d.scene.add(boxHelper);
-
-        let parent = this.isElement(target)
-
-        // this.world3d.addSphere(target.point, 1)
-
-        if (parent) {
-
-            if (parent.gameTag.includes('character')) {
-
-                console.log(parent, this.world3d.characters)
-                
-                let character = this.world3d.characters.find(c => c.uid === parent.uid)
-                character.hit()
-
-            }
-
-            // console.log('zombie', target, parent)
-            // const sound = parent.userData.sounds['bullet_hit']
-            // sound.play()
-            const sound = this.camAudioManager.getSound('bullet_hit');
-            
-            if (sound.isPlaying) sound.stop()
-   
-            sound.play()
-
-            //await this.#createSphere(target)
-
-        } 
-
-    };
-
-    isElement(target) {
-        let parent = target.object.parent
-        while(parent) {
-            if (parent.gameTag) return parent
-            parent = parent.parent
-        }
-
-        return false
     }
 
 }

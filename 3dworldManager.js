@@ -92,16 +92,20 @@ export class World3d {
 
         camera.position.set(30, 30, 30)
         camera.lookAt(new THREE.Vector3(0, 0, 0))
-        camera.layers.enable(0)
-        camera.layers.enable(1)
-        camera.layers.enable(2)
-        camera.layers.enable(3)
+        for (let key of Object.keys(this.cameras)) {
+
+            for (let i = 0; i < 32; i++) {
+
+                this.cameras[key].cam.layers.enable(i)
+    
+            }
+
+        }
 
   
         // Set up OrbitControls
         
         controls.target.set(0, 0, 0); // The point the camera orbits around
-        
 
     }
 
@@ -247,7 +251,7 @@ export class World3d {
         this.cameras[tag] = camera
     }
 
-    loadModel = (path, name) => {
+    loadModel = (path, name='') => {
 
         return new Promise((resolve, reject) => {
 
@@ -257,10 +261,9 @@ export class World3d {
                 this.scene.add(model);
     
                 model.traverse(c => {
-                    model.castShadow = true;
+                    c.castShadow = true;
                 })
                 
-                this.models[name] = model
     
                 resolve(gltf);
 

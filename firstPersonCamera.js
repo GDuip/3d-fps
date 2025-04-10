@@ -12,11 +12,10 @@ var characterIndex = 0
 let camera
 
 let characters = []
-let numCharacters = 2
+let numCharacters = 6
 let characterCamera = true
 
 let character
-let zombie
 
 let enemy
 
@@ -58,36 +57,22 @@ const initThreeJS = async () => {
 
   for (let i = 0; i < numCharacters; i++) {
 
-    let char = new Character(world3d, i + 1)
+    let char = new Character(world3d, i)
 
-    const charPromise = char.initialize().then(() => {
+    const charPromise = char.initialize().then(async () => {
 
       characters.push(char)
 
-      if (i == 0) {
+      // if (i == 0) {
 
-        localStorage.setItem('characterId', char.uid)
-        character = char
+      //   let sounds // = character.camAudioManager.getSounds('zombie')
+      //   enemy = new Enemy(world3d, sounds, char)
+      //   await enemy.initialize()
+      //   // zombie.userData.sounds = sounds
+      //   // for (let sound of Object.keys(sounds)) zombie.add(sounds[sound])
+      //   char.addTarget(enemy.object)
 
-        world3d.loadModel('models/ZombieGood.glb', 'zombie').then(gltf => {
-
-          zombie = gltf.scene
-          character.addTarget(zombie)
-
-          zombie.position.set(0, 0, 20)
-
-
-          //Sounds
-          let sounds = character.camAudioManager.getSounds('zombie')
-          zombie.userData.sounds = sounds
-          for (let sound of Object.keys(sounds)) zombie.add(sounds[sound])
-
-          enemy = new Enemy(world3d, sounds, '_zombie_', gltf)
-
-
-        })
-
-      }
+      // }
 
     })
 
@@ -97,7 +82,7 @@ const initThreeJS = async () => {
 
   await Promise.all(characterPromises);
 
-  for (let i = 0; i < numCharacters - 1; i++) {
+  for (let i = 0; i < numCharacters; i++) {
 
     for (let j = 0; j < numCharacters; j++) {
 
@@ -109,6 +94,7 @@ const initThreeJS = async () => {
   }
 
   character = characters[characterIndex]
+  character.use()
 
 }
 
@@ -126,55 +112,13 @@ function animate() {
 
   delta = clock.getDelta();
 
-  if (zombie && character.character) {
+  if (enemy) {
 
-    const direction = new THREE.Vector3();
-    direction.y = 0
-    direction.x = character.character.position.x - zombie.position.x
-    direction.z = character.character.position.z - zombie.position.z
-    direction.normalize();
-
-    const zombiePosition = new THREE.Vector3(zombie.position.x, 0, zombie.position.z);
-    const cameraPosition = new THREE.Vector3(character.character.position.x, 0, character.character.position.z);
-
-    const distance = zombiePosition.distanceTo(cameraPosition);
-
-    if (distance > 1) {
-
-      let state = enemy.getState()
-      let scalar = 0
-
-      if (state == "fastrun") {
-        scalar = 3 / 0.5666666626930237
-      } else if (state == "walk") {
-        scalar = 1.46 / 4
-      }
-
-      // Move the zombie towards the camera
-      //zombie.position.add(direction.multiplyScalar(((scalar) * delta * enemy.scale)));
-
-    } else {
-
-      //enemy.attack()
-
-      let sound = character.camAudioManager.getSound('zombie_hit')
-
-      if (!sound.isPlaying) {
-        //sound.play()
-        character.showBloodEffect()
-      }
-
-    }
-
-    const targetPosition = character.character.position.clone()
-    targetPosition.y = zombie.position.y
-    zombie.lookAt(targetPosition)
-
-    enemy.update(delta)
+    enemy.goToTarget(delta)
 
   }
 
-  if (characterCamera) camera = character.camera
+  if (characterCamera && character) camera = character.camera
   else camera = camera1
 
   controls.update(delta)
@@ -182,7 +126,10 @@ function animate() {
   // physics.update(delta)
   //PHYSICS STUFF FINISH
 
-  character.update(delta)
+
+  for (let i = 0; i < characters.length; i++) {
+    characters[i].update(delta)
+  }
 
   render()
 
@@ -193,23 +140,19 @@ function render() {
 }
 
 
-
 //---------------------------------------------------------------------------------
 
 
-
-
-
-// Prevent the context menu for the entire document
-document.addEventListener('contextmenu', function (event) {
-  //event.preventDefault();
-});
+// // Prevent the context menu for the entire document
+// document.addEventListener('contextmenu', function (event) {
+//   //event.preventDefault();
+// });
 
 function onWindowResize() {
 
   for (let i = 0; i < numCharacters; i++) {
-    characters[i].camera.aspect = window.innerWidth / window.innerHeight;
-    characters[i].camera.updateProjectionMatrix();
+    characters[i].camera.camera.aspect = window.innerWidth / window.innerHeight
+    characters[i].camera.camera.updateProjectionMatrix()
   }
 
   camera1.aspect = window.innerWidth / window.innerHeight
@@ -220,30 +163,25 @@ function onWindowResize() {
 
 }
 
-function getBoundedCharacterFromIndex(i, n) {
-  return characters[(i % n + n) % n]
-}
-
 document.addEventListener('keydown', function (event) {
-  // Check if the key pressed is "1"
 
-  if (event.key == 'ArrowRight') {
-    characterIndex++
-    let character = getBoundedCharacterFromIndex(characterIndex, characters.length)
-    localStorage.setItem('characterId', character.uid)
-    camera = character.camera
-  } else if (event.key == 'ArrowLeft') {
-    characterIndex--
-    let character = getBoundedCharacterFromIndex(characterIndex, characters.length)
-    localStorage.setItem('characterId', character.uid)
-    camera = character.camera
+
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+
+    this.characters[characterIndex].unUse()
+    if (event.key === 'ArrowRight') characterIndex = (characterIndex + 1) % numCharacters
+    else characterIndex = (characterIndex - 1 + numCharacters) % numCharacters
+
+    // Get the current character and update localStorage and camera
+    camera = characters[characterIndex].camera;
+    characters[characterIndex].use()
+
   }
 
   if (event.key === '1') {
-    // Perform your desired action here
-    characterCamera = false
-  } else if (event.key === '2') {
-    characterCamera = true
+    // Toggle characterCamera (assuming characterCamera is a boolean)
+    characterCamera = !characterCamera;
   }
+})
 
-});

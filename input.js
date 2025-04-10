@@ -46,7 +46,7 @@ export class InputController {
             case 0: {
                 this.current_.leftButton = true;
                 
-                this.sm.shoot()
+                this.sm.startShooting();
 
                 break;
             }
@@ -62,6 +62,10 @@ export class InputController {
         switch (e.button) {
             case 0: {
                 this.current_.leftButton = false;
+
+                if (this.sm.isAutomatic) {
+                    this.sm.stopShooting()
+                } else this.sm.shooting = false
                 break;
             }
             case 2: {

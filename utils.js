@@ -29,11 +29,7 @@ export function createHealthBar() {
 
     const aspectRatio = canvas.width / canvas.height;
 
-    const scale = 4
-
-    sprite.scale.set( scale*aspectRatio, scale, scale);
-    sprite.updateMatrixWorld(true)
-    // sprite.rotation.x = -Math.PI / 2;
+    sprite.scale.set(0.5*aspectRatio, 1, 1);
 
     return sprite;
 }

@@ -349,3 +349,110 @@ this.world3d.scene.add(this.boxHelperGun);
 
 
 this.character.size = size
+
+
+function setPhysics() {
+
+  const size = this.size
+
+  // const radius = size.x * 0.5; // Assuming width of the character is appropriate for the radius
+  // const height = size.y - 2 * radius; // Subtract the diameter of the capsule ends
+  // const colShape = new Ammo.btCapsuleShape(radius, height);
+
+  // Ammo.js expects half-extents for the btBoxShape
+  const halfExtents = new Ammo.btVector3(size.x * 0.5, size.y * 0.5, size.z * 0.5);
+  const colShape = new Ammo.btBoxShape(halfExtents);
+
+  const transform = new Ammo.btTransform();
+  transform.setIdentity();
+
+  // Use the position of the character's mesh (or Object3D) to set the initial position of the physics body
+  const pos = this.character.position.clone();
+  transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+
+  console.log("Bounding Box:", this.box);
+  console.log("Character Position:", this.character.position);
+  console.log("Adjusted Position:", pos.y);
+  console.log("Character", this.character)
+
+  // Motion state and local inertia
+  const motionState = new Ammo.btDefaultMotionState(transform);
+  const localInertia = new Ammo.btVector3(0, 0, 0);
+  const mass = 80
+  colShape.calculateLocalInertia(mass, localInertia); // Mass = 1
+
+  // Set the collision margin
+  colShape.setMargin(0.5); // Adjust the margin as needed
+
+  const rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
+  const body = new Ammo.btRigidBody(rbInfo);
+
+  body.activate()
+  // body.setDamping(0.9, 0.9); // Set damping factors for linear and angular motion
+
+  body.setFriction(0.1);    // Adjust friction
+  body.setRestitution(0.2); // Lower restitution to avoid bouncing
+
+  this.setBody(body)
+
+  return body
+}
+
+function setBody(body) {
+  this.body = body
+  this.fpsCamera.setBody(body)
+}
+
+function createSphere(target) {
+
+  const sound = this.camAudioManager.getSound('linkedin_msg')
+  
+  const sphereGeometry1 = new THREE.SphereGeometry(0.3, 32, 32); // Radius 5, width and height segments 32
+  const sphereMaterial1 = new THREE.MeshLambertMaterial({ color: 0xff0000 }); // Red color
+  const sphere = new THREE.Mesh(sphereGeometry1, sphereMaterial1);
+  const hitPoint = target.point;
+  sphere.position.copy(hitPoint);
+  this.scene.add(sphere);
+
+  sphere.add(sound);
+
+  sound.play();
+  target.object.attach(sphere);
+
+}
+
+
+updateBullets = () => {
+
+  [...this.bullets].forEach((bullet) => {
+
+      // Save the current position before moving the bullet
+      const previousPosition = bullet.model.position.clone();
+
+      // Move the bullet
+      bullet.model.position.add(bullet.model.getWorldDirection(new THREE.Vector3()).normalize().multiplyScalar(bullet.speed));
+
+      // Get the new position after moving the bullet
+      const currentPosition = bullet.model.position.clone();
+
+      // Cast a ray from the previous position to the current position to check for intersections
+      this.raycaster.set(previousPosition, currentPosition.clone().sub(previousPosition).normalize());
+
+      // Extend the ray length to cover the distance between the two positions
+      const distance = previousPosition.distanceTo(currentPosition);
+      this.raycaster.far = distance;
+
+      const hits = this.raycaster.intersectObjects(this.availableTargets, true);
+
+      const remove = bullet.manage();
+      if (remove) this.removeBullet(bullet);
+
+      if (hits.length > 0) {
+          const firstHitTarget = hits[0];
+          this.onTargetHit(firstHitTarget, bullet);
+          this.removeBullet(bullet);
+      }
+
+      // NOTE: Additional bullet physics like gravity can be applied here after collision detection
+  });
+};

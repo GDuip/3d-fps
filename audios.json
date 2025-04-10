@@ -1,0 +1,8 @@
+{
+    "./audio": {
+        "non_positional": {
+            "m4_silencer": "m4_silencer.mp3",
+            "blaster": "blaster.mp3"
+        }
+    }
+}

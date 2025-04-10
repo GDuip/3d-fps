@@ -228,52 +228,35 @@ export function HSVtoHSL(h, s, v) {
     return { h, s, l };
 }
 
-export class CameraAudioManager {
+export function getBloodMesh() {
 
-    constructor(camera) {
+    // Load the blood texture
+    const loader = new THREE.TextureLoader();
+    const bloodTexture = loader.load('./images/blood.png');
 
-        this.camera = camera
+    // Create a material using the blood texture
+    const bloodMaterial = new THREE.MeshBasicMaterial({
+        map: bloodTexture,
+        transparent: true, // Enable transparency so the background shows through
+        opacity: 0.8 // Adjust opacity for the desired effect
+    });
 
-        this.listener = new THREE.AudioListener();
-        camera.add( this.listener );
-        this.audioLoader = new THREE.AudioLoader();
-        this.sounds = {}
+    // Create a plane geometry that will cover the entire screen
+    const aspect = window.innerWidth / window.innerHeight;
+    const bloodGeometry = new THREE.PlaneGeometry(2 * aspect, 2); // Size it to cover the screen
 
-    }
+    // Create the mesh
+    const bloodMesh = new THREE.Mesh(bloodGeometry, bloodMaterial);
 
-    async loadSound(path, tag) {
+    // Position the plane in front of the camera
+    bloodMesh.position.set(0, 0, -1.2); // Slightly in front of the camera
 
-        const sound = new THREE.PositionalAudio( this.listener );
-
-        this.audioLoader.load( path, ( buffer ) => {
-
-            sound.setBuffer( buffer );
-            sound.setRefDistance( 20 );
-
-            if (tag == "bullet_hit") 
-                sound.setVolume(1.0); // Adjust the volume level as needed (0.0 to 1.0)
-
-            this.sounds[tag] = sound
-        });
-
-    }
-
-    getSounds(subTag) {
-        let res = {}
-
-        for ( let key of Object.keys(this.sounds)) {
-     
-            if (key.indexOf(subTag) == 0)
-                res[key] = this.sounds[key]
-        }
-
-        return res
-    }
-
-    getSound(tag) {
-
-        return this.sounds[tag]
-
-    }
+    return bloodMesh
 
 }
+
+export function getRandomPosition(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+

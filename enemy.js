@@ -1,159 +1,114 @@
 import * as THREE from 'three';
-import { createHealthBar, generateUUID } from "./utils";
+import { generateUUID } from "./utils";
+import { Model } from './model';
 
 export class Enemy {
 
-    constructor (world3d, sounds, name, gltf) {
+    constructor (world3d, sounds, target) {
 
         this.uid = generateUUID()
         this.health = 100
-        this.sounds = sounds
         this.yellLow = 3
-        this.yellHigh = 6
-        this.object = gltf.scene
-        this.world3d = world3d
         this.fadeOutDuration = 5000
+        this.initialPosition = new THREE.Vector3(0, 0, 20)
+        this.height = 15
+        this.yellHigh = 6
+        this.sounds = sounds
+        this.object = null
+        this.world3d = world3d
         this.actions = {}
         this.currentAction = null
-        this.object.gameTag = name
-
-        this.scale = 7
-        this.object.scale.set(this.scale, this.scale, this.scale)
-
-        this.mixer = new THREE.AnimationMixer(this.object)
-
-        if (gltf.animations && gltf.animations.length > 0) {
-
-            gltf.animations.forEach(animationClip => {
-
-              const action = this.mixer.clipAction(animationClip);
-              
-              this.actions[animationClip.name] = action
-              
-
-            });
-
-          }
-
-          const box = new THREE.Box3().setFromObject(this.object);
-          const size = new THREE.Vector3();
-          box.getSize(size); // Get the size (width, height, depth) of the bounding box
-  
-          this.size = size
-
-        //   console.log(this.actions, this.size)
-
-        //   this.walk()
+        this.model = new Model(this.world3d)
+        this.target = target
+        this.gameTag = '_zombie_'
+        this.characterPath = 'models/ZombieGood.glb'
 
     }
 
-    updateAnimations(delta) {
+    goToTarget(delta) {
 
-        this.mixer.update(delta)
+        const direction = new THREE.Vector3();
+        direction.y = 0
+        direction.x = this.target.character.position.x - this.object.position.x
+        direction.z = this.target.character.position.z - this.object.position.z
+        direction.normalize();
+    
+        const objectPosition = new THREE.Vector3(this.object.position.x, 0, this.object.position.z);
+        const cameraPosition = new THREE.Vector3(this.target.character.position.x, 0, this.target.character.position.z);
+    
+        const distance = objectPosition.distanceTo(cameraPosition);
+    
+        if (distance > 5) {
+    
+          let state = this.model.getState()
+          let scalar = 0
+    
+          if (state == "FastRun") {
+            scalar = 3 / 0.5666666626930237
+          } else if (state == "Walk") {
+            scalar = 1.46 / 4
+          }
+    
+          // Move the zombie towards the camera
+          this.object.position.add(direction.multiplyScalar(((scalar) * delta * this.model.scale)));
+    
+        } else {
+    
+          this.model.act('Attack')
+    
+        }
+    
+        const targetPosition = this.target.character.position.clone()
+        targetPosition.y = this.object.position.y
+        this.object.lookAt(targetPosition)
+    
+        this.update(delta)
 
+    }
+
+    setTarget(target) {
+        this.target = target
     }
 
     update(delta) {
-
-        this.updateAnimations(delta)
-
+        this.model.update(delta)
     }
 
-    getState() {
+    async initialize() {
 
-        if (this.currentAction) {
-            return this.currentAction._clip.name.toLowerCase()
-        }
-
-        return false
-
-    }
-
-    handlePreviousAction(action) {
-
-        // action.setLoop(THREE.LoopOnce);
-
-        // // Optionally stop the action at the end (otherwise it might hold the last frame)
-        // action.clampWhenFinished = true;
-
-        if (this.currentAction) {
-            this.currentAction.fadeOut(0.5)
-        }
-
-        action.reset()
-        action.fadeIn(0.5)
-
-        action.play()
+        this.model = new Model(this.world3d)
+        await this.model.load(this.characterPath)
+        this.model.setSize(this.height)
         
-        this.currentAction = action
+        this.object = this.model.model
+        this.setTrace()
+
+        this.object.position.set(this.initialPosition.x, this.initialPosition.y, this.initialPosition.z)
 
     }
 
-    attack() {
-        let action = this.actions['Attack'];
-        this.handlePreviousAction(action);
-    }
-    
-    crawl() {
-        let action = this.actions['Crawl'];
-        this.handlePreviousAction(action);
-    }
-    
-    dying() {
-        let action = this.actions['Dying'];
-        this.handlePreviousAction(action);
-    }
-    
-    fastRun() {
-        let action = this.actions['FastRun'];
-        this.handlePreviousAction(action);
-    }
-    
-    idle() {
-        let action = this.actions['Idle'];
-        this.handlePreviousAction(action);
-    }
-    
-    walk() {
-        let action = this.actions['Walk'];
-        this.handlePreviousAction(action);
-    }    
+    setTrace() {
 
-    fadeOut = () => {
+        this.object.gameTag = this.gameTag
+        this.object.uid = this.uid
+        this.object.health = this.health
+        this.object.traverse((child) => {
+            child.layers.set(this.layer);
+        });
 
-        setTimeout(() => {
-            this.object.visible = false
-        }, this.fadeOutDuration)
-
-        const material = this.object.material;
-        material.transparent = true;
-    
-        const startTime = Date.now();
-    
-        while (material.opacity > 0) {
-
-            const elapsedTime = Date.now() - startTime;
-            const fadeAmount = 1 - (elapsedTime / duration);
-    
-            // Set the new opacity
-            material.opacity = Math.max(0, fadeAmount);
-    
-        }
-
-        this.world3d.scene.remove(this.object);
-    
     }
 
+    //CHANGE FUNCTION TO MANAGE THE NEW SOUND CONFIGURATION
     yell = () => {
 
 
-        const randomDelay = Math.floor(Math.random() * (this.yellHigh - this.yellLow + 1) + this.yellLow) * 1000;
+        // const randomDelay = Math.floor(Math.random() * (this.yellHigh - this.yellLow + 1) + this.yellLow) * 1000;
   
-        const keys = Object.keys(this.sounds)
+        // const keys = Object.keys(this.sounds)
 
-        this.sounds[keys[Math.floor(Math.random() * keys.length)]].play()
+        // this.sounds[keys[Math.floor(Math.random() * keys.length)]].play()
       
-        setTimeout(this.yell, randomDelay);
+        // setTimeout(this.yell, randomDelay);
 
     }
 
